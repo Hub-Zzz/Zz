@@ -1,0 +1,464 @@
+if _G.VHub then pcall(_G.VHub.Unload) end
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local TS = game:GetService("TeleportService")
+local LP = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
+
+local F = {
+	Aimbot = false, FOV = 140, Smooth = 30, Team = true, Wall = false, Swing = false,
+	ESP = false, Dist = true,
+	Speed = false, SpeedV = 30, Jump = false, JumpV = 60, InfJump = false,
+	Fly = false, Noclip = false, AntiKick = true
+}
+
+local C = {
+	bg = Color3.fromRGB(20, 20, 24),
+	top = Color3.fromRGB(28, 28, 34),
+	row = Color3.fromRGB(34, 34, 41),
+	txt = Color3.fromRGB(230, 232, 238),
+	dim = Color3.fromRGB(140, 145, 158),
+	acc = Color3.fromRGB(70, 110, 255)
+}
+
+local function mk(c, p, par)
+	local o = Instance.new(c)
+	for k, v in pairs(p or {}) do o[k] = v end
+	if par then o.Parent = par end
+	return o
+end
+
+local function round(o, r)
+	mk("UICorner", { CornerRadius = UDim.new(0, r or 6) }, o)
+end
+
+local Conns = {}
+local function on(sig, fn)
+	local c = sig:Connect(fn)
+	table.insert(Conns, c)
+	return c
+end
+
+----------------------------- UI
+local gui = mk("ScreenGui", { Name = "VHub", ResetOnSpawn = false, IgnoreGuiInset = true }, LP:WaitForChild("PlayerGui"))
+
+local win = mk("Frame", { Size = UDim2.fromOffset(400, 280), Position = UDim2.new(0.5, -200, 0.5, -140), BackgroundColor3 = C.bg }, gui)
+round(win, 8)
+mk("UIStroke", { Color = Color3.fromRGB(52, 54, 66), Thickness = 1 }, win)
+
+local bar = mk("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.top }, win)
+round(bar, 8)
+mk("TextLabel", { Size = UDim2.new(1, -70, 1, 0), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = "VENICE HUB", TextColor3 = C.txt, TextSize = 12, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, bar)
+
+local close = mk("TextButton", { Size = UDim2.fromOffset(22, 22), Position = UDim2.new(1, -27, 0, 4), BackgroundColor3 = C.row, Text = "X", TextColor3 = C.txt, TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false }, bar)
+round(close, 4)
+
+local float = mk("TextButton", { Size = UDim2.fromOffset(42, 42), Position = UDim2.new(1, -58, 1, -58), BackgroundColor3 = C.acc, Text = "V", TextColor3 = Color3.new(1, 1, 1), TextSize = 18, Font = Enum.Font.GothamBold, Visible = false }, gui)
+round(float, 21)
+
+local function setOpen(v)
+	win.Visible = v
+	float.Visible = not v
+end
+
+close.MouseButton1Click:Connect(function() setOpen(false) end)
+float.MouseButton1Click:Connect(function() setOpen(true) end)
+
+local drag, off
+on(bar.InputBegan, function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		drag = true
+		off = i.Position - win.AbsolutePosition
+	end
+end)
+on(UIS.InputChanged, function(i)
+	if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+		win.Position = UDim2.fromOffset(i.Position.X - off.X, i.Position.Y - off.Y)
+	end
+end)
+on(UIS.InputEnded, function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = false end
+end)
+
+on(UIS.InputBegan, function(i, gp)
+	if gp then return end
+	if i.KeyCode == Enum.KeyCode.RightShift then setOpen(not win.Visible) end
+end)
+
+local tabs = mk("Frame", { Size = UDim2.new(1, 0, 0, 28), Position = UDim2.fromOffset(0, 30), BackgroundColor3 = C.top }, win)
+mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 2) }, tabs)
+mk("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingTop = UDim.new(0, 4) }, tabs)
+
+local body = mk("Frame", { Size = UDim2.new(1, -16, 1, -66), Position = UDim2.fromOffset(8, 62), BackgroundTransparency = 1 }, win)
+mk("UIListLayout", { Padding = UDim.new(0, 4) }, body)
+
+local pages = {}
+local function page(name)
+	local b = mk("TextButton", { Size = UDim2.fromOffset(64, 22), BackgroundColor3 = C.row, Text = name, TextColor3 = C.dim, TextSize = 11, Font = Enum.Font.GothamMedium, AutoButtonColor = false }, tabs)
+	round(b, 4)
+	local p = mk("ScrollingFrame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false }, body)
+	mk("UIListLayout", { Padding = UDim.new(0, 4) }, p)
+	pages[name] = p
+	b.MouseButton1Click:Connect(function()
+		for _, v in pairs(pages) do v.Visible = false end
+		for _, v in pairs(tabs:GetChildren()) do
+			if v:IsA("TextButton") then
+				v.TextColor3 = C.dim
+				v.BackgroundColor3 = C.row
+			end
+		end
+		p.Visible = true
+		b.TextColor3 = Color3.new(1, 1, 1)
+		b.BackgroundColor3 = C.acc
+	end)
+	return p
+end
+
+local function toggle(parent, text, key, cb)
+	local r = mk("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundColor3 = C.row }, parent)
+	round(r, 4)
+	mk("TextLabel", { Size = UDim2.new(1, -50, 1, 0), Position = UDim2.fromOffset(8, 0), BackgroundTransparency = 1, Text = text, TextColor3 = C.txt, TextSize = 11, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left }, r)
+	local sw = mk("TextButton", { Size = UDim2.fromOffset(34, 18), Position = UDim2.new(1, -42, 0.5, -9), BackgroundColor3 = C.bg, Text = "", AutoButtonColor = false }, r)
+	round(sw, 9)
+	local kn = mk("Frame", { Size = UDim2.fromOffset(14, 14), Position = UDim2.fromOffset(2, 2), BackgroundColor3 = C.dim }, sw)
+	round(kn, 7)
+	sw.MouseButton1Click:Connect(function()
+		F[key] = not F[key]
+		TweenService:Create(sw, TweenInfo.new(0.12), { BackgroundColor3 = F[key] and C.acc or C.bg }):Play()
+		TweenService:Create(kn, TweenInfo.new(0.12), {
+			Position = F[key] and UDim2.fromOffset(18, 2) or UDim2.fromOffset(2, 2),
+			BackgroundColor3 = F[key] and Color3.new(1, 1, 1) or C.dim
+		}):Play()
+		if cb then pcall(cb, F[key]) end
+	end)
+end
+
+local function slider(parent, text, key, min, max, cb)
+	local r = mk("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.row }, parent)
+	round(r, 4)
+	local l = mk("TextLabel", { Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(8, 2), BackgroundTransparency = 1, Text = text .. ": " .. F[key], TextColor3 = C.txt, TextSize = 11, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left }, r)
+	local tr = mk("TextButton", { Size = UDim2.new(1, -16, 0, 5), Position = UDim2.fromOffset(8, 24), BackgroundColor3 = C.bg, Text = "", AutoButtonColor = false }, r)
+	round(tr, 3)
+	local fl = mk("Frame", { Size = UDim2.new((F[key] - min) / (max - min), 0, 1, 0), BackgroundColor3 = C.acc }, tr)
+	round(fl, 3)
+	local hold = false
+	local function set(x)
+		local a = math.clamp((x - tr.AbsolutePosition.X) / tr.AbsoluteSize.X, 0, 1)
+		local v = math.floor(min + a * (max - min) + 0.5)
+		F[key] = v
+		fl.Size = UDim2.new(a, 0, 1, 0)
+		l.Text = text .. ": " .. v
+		if cb then pcall(cb, v) end
+	end
+	tr.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			hold = true
+			set(i.Position.X)
+		end
+	end)
+	on(UIS.InputChanged, function(i)
+		if hold then set(i.Position.X) end
+	end)
+	on(UIS.InputEnded, function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then hold = false end
+	end)
+end
+
+local function button(parent, text, cb)
+	local b = mk("TextButton", { Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = C.row, Text = text, TextColor3 = C.txt, TextSize = 11, Font = Enum.Font.GothamMedium, AutoButtonColor = false }, parent)
+	round(b, 4)
+	b.MouseButton1Click:Connect(function() pcall(cb) end)
+end
+
+----------------------------- helpers
+local function hum()
+	local c = LP.Character
+	return c and c:FindFirstChildWhichIsA("Humanoid")
+end
+local function hrp()
+	local c = LP.Character
+	return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+----------------------------- pages
+local Combat, Visual, Move, Misc = page("Combat"), page("Visual"), page("Move"), page("Misc")
+pages["Combat"].Visible = true
+tabs:GetChildren()[1].BackgroundColor3 = C.acc
+
+----------------------------- combat
+toggle(Combat, "Aimbot", "Aimbot")
+slider(Combat, "FOV", "FOV", 60, 400, function(v)
+	fovCircle.Size = UDim2.fromOffset(v * 2, v * 2)
+end)
+slider(Combat, "Suavizado", "Smooth", 5, 100)
+toggle(Combat, "Ignorar equipo", "Team")
+toggle(Combat, "Chequeo de muro", "Wall")
+toggle(Combat, "Auto swing", "Swing")
+
+----------------------------- visual
+toggle(Visual, "ESP", "ESP", function(v)
+	if not v then
+		for _, p in pairs(Players:GetPlayers()) do
+			local c = p.Character
+			local g = c and c:FindFirstChild("VEsp")
+			if g then g:Destroy() end
+		end
+	end
+end)
+toggle(Visual, "Mostrar distancia", "Dist")
+button(Visual, "Fullbright", function()
+	local l = game:GetService("Lighting")
+	l.Brightness = 3
+	l.ClockTime = 14
+	l.GlobalShadows = false
+	l.FogEnd = 1e6
+end)
+
+local fovCircle = mk("Frame", { Size = UDim2.fromOffset(F.FOV * 2, F.FOV * 2), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1, Visible = true }, gui)
+round(fovCircle, 999)
+mk("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 1, Transparency = 0.6 }, fovCircle)
+
+----------------------------- move
+slider(Move, "Velocidad", "SpeedV", 16, 120)
+slider(Move, "Salto", "JumpV", 50, 200)
+toggle(Move, "Velocidad", "Speed")
+toggle(Move, "Salto alto", "Jump")
+toggle(Move, "Infinite jump", "InfJump")
+toggle(Move, "Fly", "Fly")
+toggle(Move, "Noclip", "Noclip")
+button(Move, "TP al más cercano", function()
+	local h = hrp()
+	local best, d = nil, math.huge
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (p.Character.HumanoidRootPart.Position - h.Position).Magnitude
+			if dist < d then best, d = p, dist end
+		end
+	end
+	if best then h.CFrame = best.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3) end
+end)
+
+----------------------------- misc
+toggle(Misc, "Anti kick", "AntiKick")
+button(Misc, "Reconectar", function() TS:Teleport(game.PlaceId, LP) end)
+button(Misc, "Servidor nuevo", function()
+	local ok, list = pcall(function() return TS:GetPublicServerListAsync() end)
+	if ok and list and #list > 0 then
+		TS:TeleportToPlaceInstance(game.PlaceId, list[1].Id, LP)
+	end
+end)
+button(Misc, "Cerrar hub", function() setOpen(false) end)
+button(Misc, "Descargar script", function() gui:Destroy() end)
+
+----------------------------- aimbot
+local function target()
+	local best, score = nil, math.huge
+	local c = Cam.ViewportSize
+	local center = Vector2.new(c.X / 2, c.Y / 2)
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LP and p.Character then
+			local h = p.Character:FindFirstChildWhichIsA("Humanoid")
+			local root = p.Character:FindFirstChild("HumanoidRootPart")
+			if h and root and h.Health > 0 then
+				local sameTeam = F.Team and LP.Team and p.Team == LP.Team
+				if not sameTeam then
+					local ok = true
+					if F.Wall then
+						local rp = RaycastParams.new()
+						rp.FilterType = Enum.RaycastFilterType.Exclude
+						rp.FilterDescendantsInstances = { LP.Character, p.Character }
+						ok = not workspace:Raycast(Cam.CFrame.Position, root.Position - Cam.CFrame.Position, rp)
+					end
+					if ok then
+						local sp, vis = Cam:WorldToViewportPoint(root.Position)
+						if vis and sp.Z > 0 then
+							local d = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+							if d <= F.FOV and d < score then
+								best, score = root, d
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return best
+end
+
+local function aimAt(root)
+	local sp, vis = Cam:WorldToViewportPoint(root.Position)
+	if not vis then return end
+	local c = Cam.ViewportSize
+	local delta = Vector2.new(sp.X, sp.Y) - Vector2.new(c.X / 2, c.Y / 2)
+	local a = F.Smooth / 100
+	if mousemoverel then
+		mousemoverel(delta.X * a, delta.Y * a)
+	else
+		Cam.CFrame = Cam.CFrame:Lerp(CFrame.lookAt(Cam.CFrame.Position, root.Position), a)
+	end
+end
+
+on(RunService.RenderStepped, function()
+	fovCircle.Visible = F.Aimbot
+	if F.Aimbot then
+		local t = target()
+		if t then aimAt(t) end
+	end
+end)
+
+----------------------------- swing
+task.spawn(function()
+	while true do
+		if F.Swing then
+			local c = LP.Character
+			if c then
+				for _, t in pairs(c:GetChildren()) do
+					if t:IsA("Tool") then pcall(function() t:Activate() end) end
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end)
+
+----------------------------- esp
+on(RunService.RenderStepped, function()
+	if not F.ESP then return end
+	for _, p in pairs(Players:GetPlayers()) do
+		local c = p.Character
+		local head = c and c:FindFirstChild("Head")
+		if p ~= LP and head and not head:FindFirstChild("VEsp") then
+			local bb = mk("BillboardGui", { Name = "VEsp", Size = UDim2.fromOffset(180, 34), AlwaysOnTop = true, StudsOffset = Vector3.new(0, 2.6, 0) }, head)
+			mk("TextLabel", { Name = "Name", Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = p.Name, TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0, TextSize = 12, Font = Enum.Font.GothamBold }, bb)
+			mk("TextLabel", { Name = "Dist", Size = UDim2.new(1, 0, 0, 14), Position = UDim2.fromOffset(0, 16), BackgroundTransparency = 1, Text = "", TextColor3 = Color3.fromRGB(120, 220, 255), TextStrokeTransparency = 0, TextSize = 11, Font = Enum.Font.GothamMedium }, bb)
+		end
+	end
+	for _, p in pairs(Players:GetPlayers()) do
+		local c = p.Character
+		local head = c and c:FindFirstChild("Head")
+		local bb = head and head:FindFirstChild("VEsp")
+		if bb then
+			local d = bb:FindFirstChild("Dist")
+			if d then
+				local r = hrp()
+				d.Visible = F.Dist
+				d.Text = r and math.floor((head.Position - r.Position).Magnitude) .. "m" or ""
+			end
+		end
+	end
+end)
+
+----------------------------- velocidad / vuelo
+local att, vel
+local function killVel()
+	if att then att:Destroy() end
+	if vel then vel:Destroy() end
+	att, vel = nil, nil
+end
+
+local function ensureVel()
+	local r = hrp()
+	if not r then return end
+	if vel and vel.Parent ~= r then killVel() end
+	if not vel then
+		att = mk("Attachment", {}, r)
+		vel = mk("LinearVelocity", { Attachment0 = att, MaxForce = 1e6, RelativeTo = Enum.ActuatorRelativeTo.World }, r)
+	end
+	return vel
+end
+
+on(RunService.Heartbeat, function()
+	local h = hum()
+	if not h then
+		killVel()
+		return
+	end
+	if F.Speed or F.Fly then
+		local v = ensureVel()
+		if v then
+			if F.Fly then
+				local dir = Vector3.zero
+				local cf = Cam.CFrame
+				if UIS:IsKeyDown(Enum.KeyCode.W) then dir += cf.LookVector end
+				if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= cf.LookVector end
+				if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= cf.RightVector end
+				if UIS:IsKeyDown(Enum.KeyCode.D) then dir += cf.RightVector end
+				if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
+				if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+				v.VectorVelocity = dir.Magnitude > 0 and dir.Unit * F.SpeedV or Vector3.zero
+			else
+				local mv = h.MoveDirection * F.SpeedV
+				if mv.Magnitude < 0.1 and h.FloorMaterial == Enum.Material.Air then
+					v.VectorVelocity = Vector3.new(0, h.RootPart.AssemblyLinearVelocity.Y, 0)
+				else
+					v.VectorVelocity = mv
+				end
+			end
+		end
+		h.WalkSpeed = math.min(F.SpeedV, 20)
+	else
+		killVel()
+		h.WalkSpeed = 16
+	end
+	if F.Jump then
+		h.UseJumpPower = true
+		h.JumpPower = F.JumpV
+	end
+	if F.Noclip then
+		for _, p in pairs(LP.Character:GetDescendants()) do
+			if p:IsA("BasePart") then p.CanCollide = false end
+		end
+	end
+end)
+
+on(UIS.JumpRequest, function()
+	if F.InfJump then
+		local h = hum()
+		if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+	end
+end)
+
+----------------------------- bypass
+if hookmetamethod then
+	pcall(function()
+		local old
+		old = hookmetamethod(game, "__namecall", function(self, ...)
+			if getnamecallmethod() == "Kick" and self == LP and F.AntiKick and not checkcaller() then
+				return
+			end
+			return old(self, ...)
+		end)
+	end)
+end
+
+LP.Idled:Connect(function()
+	local VU = game:GetService("VirtualUser")
+	VU:CaptureController()
+	VU:ClickButton2(Vector2.new())
+end)
+
+LP.CharacterAdded:Connect(function(c)
+	local h = c:WaitForChild("Humanoid")
+	h.WalkSpeed = math.min(F.SpeedV, 20)
+	h.UseJumpPower = true
+	h.JumpPower = F.JumpV
+	killVel()
+end)
+
+----------------------------- unload
+_G.VHub = {
+	Unload = function()
+		for _, c in ipairs(Conns) do pcall(function() c:Disconnect() end) end
+		killVel()
+		local h = hum()
+		if h then
+			h.WalkSpeed = 16
+			h.JumpPower = 50
+		end
+		gui:Destroy()
+		_G.VHub = nil
+	end
+}
